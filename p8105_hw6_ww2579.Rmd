@@ -59,8 +59,8 @@ glm(resolution ~ victim_age + victim_sex + victim_race, data = baltimore_df,fami
   broom::tidy() %>%
   mutate(
     OR = exp(estimate),
-    CL_lower = exp(estimate - 1.96 * std.error),
-    CL_upper = exp(estimate + 1.96 * std.error)) %>%
+    CI_lower = exp(estimate - 1.96 * std.error),
+    CI_upper = exp(estimate + 1.96 * std.error)) %>%
   select(term, OR, starts_with(("CI"))) %>%
   knitr::kable(digits = 3)
 ```
@@ -282,7 +282,26 @@ plot_beta
 
 **Comments:**
 
-The distribution of r^2 seems to have a mean of `r mean(log_df$r.squared)`, which is a quite high coefficient of determination, indicating on average, the model fits well on data. It can also be observed that there is a longer tail on the left side of the curve, which may be related to the frequency with which large outliers are included in bootstrap samples.
+The distribution of r^2 seems to have a mean of 0.91, which is a quite high coefficient of determination, indicating on average, the model fits well on data. It can also be observed that there is a longer tail on the left side of the curve, which may be related to the frequency with which large outliers are included in bootstrap samples.
 
-The distribution of log product of beta0 and beta1 is approximately normal, with a mean of `r mean(log_df$log_estimates)`.
+The distribution of log product of beta0 and beta1 is approximately normal, with a mean of 2.01.
 
+Compute 95% CI for r^2
+
+```{r}
+lower_r2 = mean(log_df$r.squared) - qnorm(0.975) * sd(log_df$r.squared)
+upper_r2 = mean(log_df$r.squared) + qnorm(0.975) * sd(log_df$r.squared)
+```
+
+Compute 95% CI for log product of beta0 and beta1
+
+```{r}
+lower_log = mean(log_df$log_estimates) - qnorm(0.975) * sd(log_df$log_estimates)
+upper_log = mean(log_df$log_estimates) + qnorm(0.975) * sd(log_df$log_estimates)
+```
+
+**Interpretation:**
+
+We are 95% confident that the r^2 will fall in somewhere between 0.895 and 0.928 for the regression analysis of tmax vs tmin. 
+
+We are 95% confident that the log product of beta0 and beta1 will fall in somewhere between 1.966 and 2.060 for the regression analysis of tmax vs tmin. 
