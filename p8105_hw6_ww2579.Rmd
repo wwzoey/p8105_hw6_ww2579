@@ -96,4 +96,70 @@ models_results_df %>%
   theme(axis.title.x = element_text(angle = 90, hjust = 1))
 ```
 
+# Problem 2
+
+Import and tidy the raw data.
+
+```{r}
+bwt_df = read.csv("./data/birthweight.csv") %>%
+  mutate(babysex = as.factor(babysex),
+         frace = as.factor(frace),
+         malform = as.factor(malform),
+         mrace = as.factor(mrace),
+         parity = as.factor(parity)) %>%
+  filter(parity != 3,
+         parity != 6)
+# Parity levels of 3 and 6 get removed because they contain only one observation, when I do the cross-validation step, errors would occur if the two single observations are included in the model.
+
+```
+
+
+Fit a regression model for birthweight.
+
+```{r}
+fit_bwt = lm(bwt~babysex + bhead + blength + delwt + fincome + frace + gaweeks + malform + menarche + mheight + momage + mrace + parity + pnumlbw + pnumsga + ppbmi + ppwt + smoken + wtgain, data = bwt_df)
+
+step(fit_bwt, direction = "backward")
+
+multi10_fit = lm(bwt~babysex + bhead + blength + delwt + fincome + gaweeks + mheight + mrace + ppwt + smoken, data = bwt_df)
+
+multi3_fit = lm(bwt~babysex + bhead + blength, data = bwt_df)
+# Criterion-based procedures
+AIC(fit_bwt)
+AIC(multi3_fit)
+AIC(multi10_fit)
+```
+
+First, I fitted all variables in a MLR model, and apply stepwise regression to select predictors for the "best" model. Then I used the criterion-based procedures to check for AIC. Compared to the values of AIC from the full model (19 predictors) and 3-predictor model, the model obtained from the stepwise elimination has the smallest AIC. 
+
+Selected predictors: babysex, bhead, blength, delwt, fincome, gaweeks, mheight, mrace, ppwt, smoken. 
+
+Plot model residuals vs fitted values.
+
+```{r}
+new_df = bwt_df %>%
+  add_predictions(multi10_fit) %>%
+  add_residuals(multi10_fit)
+
+resid_pred_plt = 
+  new_df %>%
+  ggplot(aes(x = pred, y = resid)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = F)
+
+resid_pred_plt
+```
+
+
+The second fitted model:
+
+```{r}
+fit2 = lm(bwt~blength + gaweeks, data = bwt_df)
+```
+
+The third fitted model:
+
+```{r}
+fit3 = lm(bwt~babysex + bhead + blength + babysex*bhead + babysex*blength + babysex*bhead*blength, data = bwt_df)
+```
 
