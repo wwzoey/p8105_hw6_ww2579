@@ -107,9 +107,8 @@ bwt_df = read.csv("./data/birthweight.csv") %>%
          malform = as.factor(malform),
          mrace = as.factor(mrace),
          parity = as.factor(parity)) %>%
-  filter(parity != 3,
-         parity != 6)
-# Parity levels of 3 and 6 get removed because they contain only one observation, when I do the cross-validation step, errors would occur if the two single observations are included in the model.
+  mutate(babysex = recode(babysex, "1" = "male", "2" = "female"),
+         mrace = recode(mrace, "1" = "White", "2" = "Black", "3" = "Asian", "4" = "Puerto Rican", "8" = "Other"))
 
 ```
 
@@ -117,20 +116,31 @@ bwt_df = read.csv("./data/birthweight.csv") %>%
 Fit a regression model for birthweight.
 
 ```{r}
+# Full model
 fit_bwt = lm(bwt~babysex + bhead + blength + delwt + fincome + frace + gaweeks + malform + menarche + mheight + momage + mrace + parity + pnumlbw + pnumsga + ppbmi + ppwt + smoken + wtgain, data = bwt_df)
+summary(fit_bwt) 
 
-step(fit_bwt, direction = "backward")
-
+# 10 predictors model
 multi10_fit = lm(bwt~babysex + bhead + blength + delwt + fincome + gaweeks + mheight + mrace + ppwt + smoken, data = bwt_df)
+summary(multi10_fit)
 
-multi3_fit = lm(bwt~babysex + bhead + blength, data = bwt_df)
+# 6-predictor model
+multi6_fit = lm(bwt~babysex + bhead + blength + delwt + gaweeks + mrace, data = bwt_df)
+summary(multi6_fit)
+
+# 4-predictor model
+multi4_fit = lm(bwt~babysex + bhead + blength + wtgain, data = bwt_df)
+summary(multi4_fit)
+
+
 # Criterion-based procedures
 AIC(fit_bwt)
-AIC(multi3_fit)
 AIC(multi10_fit)
+AIC(multi6_fit)
+AIC(multi4_fit)
 ```
 
-First, I fitted all variables in a MLR model, and apply stepwise regression to select predictors for the "best" model. Then I used the criterion-based procedures to check for AIC. Compared to the values of AIC from the full model (19 predictors) and 3-predictor model, the model obtained from the stepwise elimination has the smallest AIC. 
+First, I fitted all variables in a MLR model, and select variables of interest to build different models. Based on the summary of regression models, I compare the adjusted r^2 to check the goodness of fit. Among the 4 models above, the model with 10 predictors has the largest value of the adjusted r^2. Then I applied the criterion-based procedures to check for AIC to obtain a relatively "good" model. As a result, the 10-predictor model has the smallest AIC value. 
 
 Selected predictors: babysex, bhead, blength, delwt, fincome, gaweeks, mheight, mrace, ppwt, smoken. 
 
@@ -143,26 +153,35 @@ new_df = bwt_df %>%
 
 resid_pred_plt = 
   new_df %>%
-  ggplot(aes(x = pred, y = resid)) +
+  ggplot(aes(x = pred, y = resid,color = babysex)) +
   geom_point() +
   geom_smooth(method = "lm", se = F)
 
 resid_pred_plt
 ```
 
+**Interpretation:**
+
+As it is shown on the graph, most of the residuals bounce around 0, but the variance seems not quite constant and outliers are observed on the upper left.
+
 
 The second fitted model:
 
 ```{r}
 fit2 = lm(bwt~blength + gaweeks, data = bwt_df)
+summary(fit2)
 ```
 
 The third fitted model:
 
 ```{r}
-fit3 = lm(bwt~babysex + bhead + blength + babysex*bhead + babysex*blength + babysex*bhead*blength, data = bwt_df)
+fit3 = lm(bwt~babysex*bhead*blength, data = bwt_df)
+summary(fit3)
 ```
 
+**Comments:**
+
+Based on regression analysis of two models, the model with a 3-way interaction seems fit better than the two-predictor model. The larger r^2 value implies a better "goodness of fit". From the results of fit3, the 3-way interaction of sex, head circumference and length at birth is statistically significant; while there seems no interaction effect between the head circumference and baby's length at birth.
 
 Compare 3 models above using cross validation.
 
@@ -180,7 +199,7 @@ cv_df =
   mutate(  
     fit1 = map(train, ~lm(data = .x, bwt~babysex + bhead + blength + delwt + fincome + gaweeks + mheight + mrace + ppwt + smoken)), 
     fit2 = map(train, ~lm(bwt~blength + gaweeks, data = .x)),
-    fit3 = map(train, ~lm(bwt~babysex + bhead + blength + babysex*bhead + babysex*blength + babysex*bhead*blength, data = .x))) %>% 
+    fit3 = map(train, ~lm(bwt~babysex*bhead*blength, data = .x))) %>% 
   mutate(rmse_fit1 = map2(fit1, test, ~rmse(model = .x, data = .y)), 
          rmse_fit2 = map2(fit2, test, ~rmse(model = .x, data = .y)),
          rmse_fit3 = map2(fit3, test, ~rmse(model = .x, data = .y)))
@@ -197,8 +216,31 @@ cv_df %>%
   ggplot(aes(x = model, y = rmse)) + 
   geom_violin() +
   labs(
-    title = "Prediction Error Distributions"
-  )
+    title = "Prediction Error Distributions")
 ```
 
 **Comments:**
+
+Fit1 is the model that I built by variable selection. Fit2 uses length at birth and gestational age as predictors. Fit3 is the one contains 3-way interaction term.
+The graph of "Prediction Error Distributions" is used to compared predictive performance of different models. RMSE is computed for measurements. Based on what is shown on the graph, the first fitted model (i.e. 10-predictor model) has the lowest value of RMSE, thus has the best predictive performance among the three models. The second one, however, has the least predictive accuracy.
+
+
+# Problem 3
+
+Import and tidy and weather_df.
+
+```{r}
+weather_df = 
+  rnoaa::meteo_pull_monitors(
+    c("USW00094728"),
+    var = c("PRCP", "TMIN", "TMAX"), 
+    date_min = "2017-01-01",
+    date_max = "2017-12-31") %>%
+  mutate(
+    name = recode(id, USW00094728 = "CentralPark_NY"),
+    tmin = tmin / 10,
+    tmax = tmax / 10) %>%
+  select(name, id, everything())
+```
+
+
