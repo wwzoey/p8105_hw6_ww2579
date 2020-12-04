@@ -302,6 +302,6 @@ upper_log = mean(log_df$log_estimates) + qnorm(0.975) * sd(log_df$log_estimates)
 
 **Interpretation:**
 
-We are 95% confident that the r^2 will fall in somewhere between 0.895 and 0.928 for the regression analysis of tmax vs tmin. 
+We are 95% confident that the r^2_hat will fall in somewhere between 0.895 and 0.928 for the regression analysis of tmax vs tmin. 
 
-We are 95% confident that the log product of beta0 and beta1 will fall in somewhere between 1.966 and 2.060 for the regression analysis of tmax vs tmin. 
+We are 95% confident that the log product of beta0_hat and beta1_hat will fall in somewhere between 1.966 and 2.060 for the regression analysis of tmax vs tmin. 
