@@ -118,26 +118,21 @@ Fit a regression model for birthweight.
 ```{r}
 # Full model
 fit_bwt = lm(bwt~babysex + bhead + blength + delwt + fincome + frace + gaweeks + malform + menarche + mheight + momage + mrace + parity + pnumlbw + pnumsga + ppbmi + ppwt + smoken + wtgain, data = bwt_df)
-summary(fit_bwt) 
 
 # 10 predictors model
 multi10_fit = lm(bwt~babysex + bhead + blength + delwt + fincome + gaweeks + mheight + mrace + ppwt + smoken, data = bwt_df)
-summary(multi10_fit)
 
 # 6-predictor model
 multi6_fit = lm(bwt~babysex + bhead + blength + delwt + gaweeks + mrace, data = bwt_df)
-summary(multi6_fit)
 
 # 4-predictor model
 multi4_fit = lm(bwt~babysex + bhead + blength + wtgain, data = bwt_df)
-summary(multi4_fit)
 
-
-# Criterion-based procedures
-AIC(fit_bwt)
-AIC(multi10_fit)
-AIC(multi6_fit)
-AIC(multi4_fit)
+# Look at adjusted r^2 and AIC
+broom::glance(fit_bwt)
+broom::glance(multi10_fit)
+broom::glance(multi6_fit)
+broom::glance(multi4_fit)
 ```
 
 First, I fitted all variables in a MLR model, and select variables of interest to build different models. Based on the summary of regression models, I compare the adjusted r^2 to check the goodness of fit. Among the 4 models above, the model with 10 predictors has the largest value of the adjusted r^2. Then I applied the criterion-based procedures to check for AIC to obtain a relatively "good" model. As a result, the 10-predictor model has the smallest AIC value. 
@@ -243,4 +238,51 @@ weather_df =
   select(name, id, everything())
 ```
 
+
+Bootstrapping
+
+```{r}
+set.seed(1)
+bootstrap_df = weather_df %>%
+  modelr::bootstrap(n = 5000) %>%
+  mutate(models = map(strap, ~lm(tmax~tmin, data = .x)),
+         r_squared = map(models, broom::glance),
+         estimates = map(models, broom::tidy)) %>%
+  unnest(r_squared,estimates)
+
+log_df = bootstrap_df %>%
+  select(term, estimate, r.squared) %>%
+  pivot_wider(names_from = term,
+              values_from = estimate,
+              values_fn = list) %>%
+  unnest(cols = c(`(Intercept)`, tmin)) %>%
+  rename("beta0" = '(Intercept)', "beta1" = tmin) %>%
+  mutate(log_estimates = log(beta0*beta1))
+  
+
+```
+
+Plot distributions of estimates
+
+```{r}
+plot_r_squared = 
+  log_df %>%
+  ggplot(aes(x = r.squared)) +
+  geom_density() + 
+  labs(title = "r^2 Distribution")
+plot_r_squared
+
+plot_beta = 
+  log_df %>%
+  ggplot(aes(x = log_estimates)) +
+  geom_density() +
+  labs(title = "log_estimates Distribution")
+plot_beta
+```
+
+**Comments:**
+
+The distribution of r^2 seems to have a mean of `r mean(log_df$r.squared)`, which is a quite high coefficient of determination, indicating on average, the model fits well on data. It can also be observed that there is a longer tail on the left side of the curve, which may be related to the frequency with which large outliers are included in bootstrap samples.
+
+The distribution of log product of beta0 and beta1 is approximately normal, with a mean of `r mean(log_df$log_estimates)`.
 
